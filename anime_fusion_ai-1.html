@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#100d20">
+<title>Anime Fusion AI — Character Creator</title>
+<style>
+:root{color-scheme:dark;--bg:#100d20;--panel:#1b1730;--line:#393052;--text:#f8f5ff;--muted:#b9b0d0;--accent:#a78bfa;--accent2:#ec4899}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#29204a 0,#100d20 55%);color:var(--text);font:16px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;min-height:100vh}
+main{width:min(100%,760px);margin:auto;padding:22px 16px 42px}.brand{text-align:center;margin:10px 0 22px}.brand h1{font-size:clamp(29px,8vw,44px);line-height:1.05;margin:0;background:linear-gradient(90deg,#c4b5fd,#f9a8d4);color:transparent;background-clip:text}.brand p{color:var(--muted);margin:9px 0 0;font-size:13px;letter-spacing:.13em}
+.panel{background:#1b1730eF;border:1px solid var(--line);border-radius:20px;padding:17px;margin:14px 0;box-shadow:0 12px 35px #0003}
+h2{font-size:18px;margin:0 0 12px}.sub{color:var(--muted);font-size:13px;margin:-5px 0 13px}
+.upload{display:flex;align-items:center;justify-content:center;gap:10px;min-height:116px;border:1.5px dashed #806ab6;border-radius:15px;background:#211b39;text-align:center;padding:15px;cursor:pointer}
+.upload strong{display:block}.upload small{color:var(--muted)}input[type=file]{position:absolute;width:1px;height:1px;opacity:0}
+button,select{font:inherit}button{border:0;border-radius:13px;padding:13px 16px;font-weight:750;cursor:pointer;color:#170f2b;background:linear-gradient(100deg,#c4b5fd,#f0abfc);width:100%;min-height:48px}
+button:disabled{opacity:.45;cursor:not-allowed}.secondary{background:#302747;color:var(--text);border:1px solid var(--line)}
+.controls{display:grid;grid-template-columns:1fr;gap:12px}label.field{display:grid;gap:6px;color:var(--muted);font-size:13px}select{width:100%;background:#110e20;color:var(--text);border:1px solid var(--line);border-radius:11px;padding:11px}
+#thumbs{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:13px}.thumb{position:relative;aspect-ratio:1;border-radius:11px;overflow:hidden;background:#0c0a16;border:1px solid var(--line)}.thumb img{width:100%;height:100%;object-fit:cover}.thumb span{position:absolute;bottom:0;left:0;right:0;background:#090713c9;padding:4px 6px;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#resultWrap{display:none}canvas{display:block;width:100%;height:auto;border-radius:15px;background:#0d0b18;border:1px solid var(--line)}.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.note{font-size:12px;color:var(--muted);margin:12px 2px 0}.status{min-height:20px;color:#ddd2ff;font-size:13px;margin:10px 2px 0}.pill{display:inline-block;background:#31264d;border:1px solid #574477;color:#e7ddff;border-radius:99px;padding:4px 9px;font-size:11px;margin-bottom:10px}
+footer{text-align:center;color:#8f86a9;font-size:12px;padding:10px}
+@media(min-width:600px){main{padding-top:34px}.controls{grid-template-columns:1fr 1fr}#thumbs{grid-template-columns:repeat(5,1fr)}}
+</style>
+</head>
+<body>
+<main>
+<header class="brand"><div class="pill">MOBILE-FIRST CHARACTER LAB</div><h1>ANIME FUSION</h1><p>UPLOAD • BLEND • CREATE</p></header>
+<section class="panel">
+<h2>1. Add your anime pictures</h2>
+<p class="sub">Choose 2–5 images from your phone. Use pictures you have permission to use.</p>
+<label class="upload" for="files"><span style="font-size:30px">＋</span><span><strong>Tap to upload images</strong><small>JPG, PNG or WEBP · up to 5 images</small></span></label>
+<input id="files" type="file" accept="image/png,image/jpeg,image/webp" multiple>
+<div id="thumbs"></div>
+</section>
+<section class="panel">
+<h2>2. Choose a fusion look</h2>
+<div class="controls">
+<label class="field">Fusion style
+<select id="style"><option value="dream">Dreamy fantasy</option><option value="cyber">Cyber neon</option><option value="shadow">Shadow warrior</option><option value="cel">Classic anime collage</option></select></label>
+<label class="field">Blend strength
+<select id="blend"><option value="0.35">Soft blend</option><option value="0.6" selected>Balanced</option><option value="0.85">Strong blend</option></select></label>
+</div>
+<p class="note">This free browser prototype creates an artistic layered fusion from your uploads. It does not yet use an AI model to understand or redraw character features.</p>
+<button id="generate" disabled>⚡ Create fusion preview</button>
+<div id="status" class="status" role="status"></div>
+</section>
+<section class="panel" id="resultWrap">
+<h2>3. Your fusion artwork</h2>
+<canvas id="art" width="900" height="1100"></canvas>
+<div class="actions"><button id="download">Download PNG</button><button class="secondary" id="again">Try another blend</button></div>
+<p class="note">Your selected pictures are processed on this device in this prototype. They are not uploaded to a server.</p>
+</section>
+<footer>Anime Fusion · Free browser prototype</footer>
+</main>
+<script>
+const picker=document.getElementById('files'), thumbs=document.getElementById('thumbs'), generate=document.getElementById('generate'), statusEl=document.getElementById('status'), canvas=document.getElementById('art'), ctx=canvas.getContext('2d');
+let images=[];
+function loadFile(file){return new Promise((resolve,reject)=>{const url=URL.createObjectURL(file),img=new Image();img.onload=()=>resolve({img,url,name:file.name});img.onerror=reject;img.src=url;});}
+picker.addEventListener('change',async()=>{
+  images.forEach(x=>URL.revokeObjectURL(x.url));images=[];thumbs.innerHTML='';statusEl.textContent='';
+  const files=[...picker.files].slice(0,5).filter(f=>/^image\/(png|jpeg|webp)$/.test(f.type));
+  if(files.length<2){statusEl.textContent='Please select at least 2 supported images.';generate.disabled=true;return;}
+  try{images=await Promise.all(files.map(loadFile));images.forEach((x,i)=>{const box=document.createElement('div');box.className='thumb';const im=document.createElement('img');im.src=x.url;im.alt='Selected anime image '+(i+1);const cap=document.createElement('span');cap.textContent=x.name;box.append(im,cap);thumbs.append(box);});generate.disabled=false;statusEl.textContent=images.length+' images ready.';}
+  catch(e){statusEl.textContent='One image could not be opened. Try another file.';generate.disabled=true;}
+});
+function cover(img,x,y,w,h,alpha=1,rotation=0){
+ ctx.save();ctx.globalAlpha=alpha;ctx.translate(x+w/2,y+h/2);ctx.rotate(rotation);const scale=Math.max(w/img.width,h/img.height),sw=img.width*scale,sh=img.height*scale;ctx.drawImage(img,-sw/2,-sh/2,sw,sh);ctx.restore();
+}
+function gradient(style){
+ const g=ctx.createLinearGradient(0,0,900,1100);
+ if(style==='cyber'){g.addColorStop(0,'#081a42');g.addColorStop(.5,'#48236e');g.addColorStop(1,'#07101f');}
+ else if(style==='shadow'){g.addColorStop(0,'#10101f');g.addColorStop(.55,'#3b1d42');g.addColorStop(1,'#080812');}
+ else if(style==='cel'){g.addColorStop(0,'#f6b8df');g.addColorStop(.5,'#8a9ff5');g.addColorStop(1,'#25235a');}
+ else{g.addColorStop(0,'#30265f');g.addColorStop(.55,'#8b5ca8');g.addColorStop(1,'#f0a8c9');}
+ return g;
+}
+function drawFusion(){
+ if(images.length<2)return;
+ const style=document.getElementById('style').value, strength=Number(document.getElementById('blend').value);
+ ctx.clearRect(0,0,900,1100);ctx.fillStyle=gradient(style);ctx.fillRect(0,0,900,1100);
+ // Soft ambient glow
+ const glow=ctx.createRadialGradient(450,430,30,450,430,520);glow.addColorStop(0,'#ffffff35');glow.addColorStop(1,'#ffffff00');ctx.fillStyle=glow;ctx.fillRect(0,0,900,1100);
+ // Main portrait layers, clipped to a centered oval to create a single composite portrait.
+ ctx.save();ctx.beginPath();ctx.ellipse(450,510,330,420,0,0,Math.PI*2);ctx.clip();
+ const positions=[
+  {x:120,y:90,w:660,h:840,r:-.035},
+  {x:165,y:135,w:570,h:780,r:.025},
+  {x:95,y:170,w:710,h:720,r:-.018},
+  {x:145,y:110,w:610,h:820,r:.018},
+  {x:110,y:145,w:680,h:760,r:-.01}
+ ];
+ images.forEach((item,i)=>{const p=positions[i];cover(item.img,p.x,p.y,p.w,p.h,i===0?1:strength,p.r);});
+ ctx.restore();
+ // Decorative frame and sparkles
+ ctx.save();ctx.strokeStyle=style==='cyber'?'#67e8f9':style==='shadow'?'#d8b4fe':'#fce7f3';ctx.lineWidth=8;ctx.beginPath();ctx.ellipse(450,510,337,427,0,0,Math.PI*2);ctx.stroke();
+ for(let i=0;i<70;i++){const x=(i*137)%900,y=(i*239)%1100;ctx.fillStyle=i%2?'#ffffff99':'#fbcfe899';ctx.beginPath();ctx.arc(x,y,(i%3)+1.5,0,Math.PI*2);ctx.fill();}
+ ctx.restore();
+ // Title strip
+ ctx.fillStyle='#090716bb';ctx.fillRect(0,940,900,160);
+ ctx.textAlign='center';ctx.fillStyle='#fff';ctx.font='bold 49px system-ui';ctx.fillText('FUSION CHARACTER',450,1010);
+ ctx.fillStyle='#e9d5ff';ctx.font='24px system-ui';ctx.fillText('ORIGINAL FAN-MADE CONCEPT',450,1055);
+ document.getElementById('resultWrap').style.display='block';
+}
+generate.addEventListener('click',()=>{statusEl.textContent='Creating your layered artwork…';try{drawFusion();statusEl.textContent='Fusion preview created. You can download it below.';document.getElementById('resultWrap').scrollIntoView({behavior:'smooth',block:'start'});}catch(e){statusEl.textContent='Could not create the preview. Try different images.';}});
+document.getElementById('again').addEventListener('click',()=>{drawFusion();statusEl.textContent='A fresh preview has been created using your current settings.';});
+document.getElementById('download').addEventListener('click',()=>{const a=document.createElement('a');a.download='anime-fusion-character.png';a.href=canvas.toDataURL('image/png');a.click();});
+</script>
+</body>
+</html>
